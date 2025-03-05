@@ -1,7 +1,12 @@
 from tkinter import *
+import RPi.GPIO as GPIO
+import time
+import Components as component
+import threading
+import NcrEmployees as Employee
 
 class MainMenu:
-    def __init__(self, root):
+    def __init__(self, root, hardware_action, cur, conn):
         self.root = root
 
         #main buttons
@@ -23,6 +28,7 @@ class MainMenu:
         # first part buttons and labels
         self.borrow_scan_id = Label(self.root, text='Scan your ID')
         self.borrow_scan_entry = Entry(self.root, width=30)
+        self.borrow_scan_entry.bind( '<Return>', self.show_borrow_menu )
         self.borrow_scan_next = Button(self.root, text='Submit', font=("Arial", 12, "bold"), bg="#4CAF50", fg="white",command=self.show_borrow_menu)
 
         # second part main function
@@ -43,6 +49,7 @@ class MainMenu:
         #first part
         self.return_scan_id = Label(self.root, text='Scan your ID')
         self.return_scan_entry = Entry(self.root, width=30)
+        self.return_scan_entry.bind( '<Return>', self.show_return_menu )
         self.return_scan_next = Button(self.root, text='Submit', font=("Arial", 12, "bold"), bg="#4CAF50", fg="white",command=self.show_return_menu)
 
         # second part main function
@@ -88,7 +95,13 @@ class MainMenu:
         self.user_info_register_submit = Button(self.root, text='Submit', font=("Arial", 12, "bold"), bg="#4CAF50", fg="white", command=self.user_registered_end)
 
 
-
+        #GPIO Initialization
+        self.hardware_actions = hardware_action
+        
+        #sql initialization
+        self.cur = cur
+        self.conn = conn
+         
         #UI Start program
         self.show_main_buttons()
 
@@ -167,20 +180,22 @@ class MainMenu:
         self.borrow_scan_entry.place (relx=0.5, rely=0.4, anchor= 'center')
         self.borrow_scan_next.place(relx=0.5, rely=0.6, anchor= 'center')
 
-    def show_borrow_menu(self): # use this command to change position of buttons
+    def show_borrow_menu(self, event = None): # use this command to change position of buttons
         self.borrow_scan_next.place_forget()
         self.borrow_scan_entry.place_forget()
         self.borrow_scan_id.place_forget()
-
+        
+        
         self.borrow_items.place(relx=0.2, rely=0.2, anchor="center")
         self.borrow_entry.place(relx=0.2, rely=0.4, anchor="center")
         self.borrow_submit.place(relx=0.2, rely=0.6, anchor="center")
         self.borrow_text.place(relx=0.7, rely=0.4, anchor="center")
         self.borrow_continue.place(relx=0.7, rely=0.6, anchor='w')
-
+        self.hardware_actions.employee_verified()
+        
     def borrow_add_entry(self, event=None):
         entry_text = self.borrow_entry.get()
-        self.borrow_text.insert('end', entry_text + '\n')
+        self.borrow_text.insert('end', entry_text)
         self.borrow_entry.delete(0,'end')
 
     def clear_all_entry(self):
@@ -202,6 +217,7 @@ class MainMenu:
         self.borrow_submit.place_forget()
         self.borrow_text.place_forget()
         self.borrow_continue.place_forget()
+      
 
         self.borrow_end_text.place(relx=0.5, rely=0.4, anchor='center')
     #End of Borrow Section
@@ -215,7 +231,7 @@ class MainMenu:
         self.return_scan_entry.place(relx=0.5, rely=0.4, anchor='center')
         self.return_scan_next.place(relx=0.5, rely=0.6, anchor='center')
 
-    def show_return_menu(self):
+    def show_return_menu(self, event = None):
         self.return_scan_id.place_forget()
         self.return_scan_entry.place_forget()
         self.return_scan_next.place_forget()
@@ -223,6 +239,7 @@ class MainMenu:
         self.return_items.place(relx=0.5, rely=0.2, anchor='center')
         self.return_list.place(relx=0.5, rely=0.4, anchor='center')
         self.return_continue.place(relx=0.5, rely=0.6, anchor='center')
+        self.hardware_actions.employee_verified()
 
     def return_end(self):
         self.return_list.place_forget()
@@ -251,8 +268,6 @@ class MainMenu:
         self.user_info_search_entry.place(relx=0.5, rely=0.4, anchor='center')
         self.user_info_search_submit.place(relx=0.5, rely=0.6, anchor='center')
 
-
-
     def show_user_info_credentials(self):
         self.user_info_search_label.place_forget()
         self.user_info_search_entry.place_forget()
@@ -260,6 +275,7 @@ class MainMenu:
 
         self.user_info_search_query.place(relx=0.5, rely=0.2, anchor='center')
         self.user_info_toggle_status.place(relx=0.5, rely=0.4, anchor='center')
+        
     def show_user_info_register_menu(self):
         self.user_info_main.place_forget()
         self.user_info_search.place_forget()
@@ -282,23 +298,46 @@ class MainMenu:
         self.user_info_register_submit.place(relx=0.5, rely=0.7, anchor= 'center')
 
     def user_registered_end(self):
-        self.user_info_register_label.place_forget()
-        self.user_info_register_first_name_label.place_forget()
-        self.user_info_register_first_name_entry.place_forget()
+        #user verification for registration    
+        NcrEmployee = Employee.NcrEmployees() #instantiation of ncr employee
+        
+        if self.user_info_register_first_name_entry.get() == '':
+                print('norwen')
+        elif self.user_info_register_last_name_entry.get() == '':
+                print('norwen')
+        elif self.user_info_register_qlid_entry.get() == '':
+                print('norwen')
+        elif self.user_info_register_rfid_entry.get() == '':
+                print('norwen')
+        else:
+                # assignment of values to class
+                NcrEmployee.q_lid = self.user_info_register_qlid_entry.get()
+                NcrEmployee.rfid = self.user_info_register_rfid_entry.get()
+                NcrEmployee.first_name = self.user_info_register_first_name_entry.get()
+                NcrEmployee.last_name = self.user_info_register_last_name_entry.get()
+                NcrEmployee._isActive = 1
+                
+                self.user_info_register_label.place_forget()
+                self.user_info_register_first_name_label.place_forget()
+                self.user_info_register_first_name_entry.place_forget()
+                
+                self.user_info_register_label.place_forget()
+                self.user_info_register_last_name_label.place_forget()
+                self.user_info_register_last_name_entry.place_forget()
 
-        self.user_info_register_label.place_forget()
-        self.user_info_register_last_name_label.place_forget()
-        self.user_info_register_last_name_entry.place_forget()
+                self.user_info_register_qlid_label.place_forget()
+                self.user_info_register_qlid_entry.place_forget()
 
-        self.user_info_register_qlid_label.place_forget()
-        self.user_info_register_qlid_entry.place_forget()
+                self.user_info_register_rfid_label.place_forget()
+                self.user_info_register_rfid_entry.place_forget()
 
-        self.user_info_register_rfid_label.place_forget()
-        self.user_info_register_rfid_entry.place_forget()
+                self.user_info_register_submit.place_forget()
 
-        self.user_info_register_submit.place_forget()
-
-        self.user_info_register_submit_label.place(relx=0.5, rely=0.3, anchor='center')
+                self.user_info_register_submit_label.place(relx=0.5, rely=0.3, anchor='center')
+                self.cur.execute("INSERT INTO NcrEmployees(q_lid, firstName, lastName, rfid) VALUES (?, ?, ?, ?)", (NcrEmployee.q_lid, NcrEmployee.first_name, NcrEmployee.last_name, NcrEmployee.rfid) )
+                self.conn.commit()
+                print( "SUCCESSFUL REGISTRATION" )
+                
 
 
 
